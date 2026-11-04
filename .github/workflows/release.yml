@@ -42,8 +42,14 @@ jobs:
         run: |
           set -euo pipefail
           version="$(grep -E '^version=' module.prop | cut -d= -f2)"
+          awk -v v="## ${version}" '
+            index($0, v) == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > dist/release-notes.md
+          test -s dist/release-notes.md
           gh release create "$GITHUB_REF_NAME" \
             "dist/RKP-CN-Bypass-${version}.zip" \
             "dist/SHA256SUMS" \
             --title "RKP CN Bypass ${version}" \
-            --generate-notes
+            --notes-file dist/release-notes.md
