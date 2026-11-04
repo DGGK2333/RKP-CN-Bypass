@@ -5,90 +5,37 @@
 [![Platform](https://img.shields.io/badge/platform-Magisk%20%7C%20KernelSU%20%7C%20APatch-4B8BBE?style=flat-square)](#安装)
 [![Android](https://img.shields.io/badge/Android-12%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](#适用范围)
 
-> 修复小米国行（CN）ROM 上 **`rkp_only` 机型的 Key Attestation 永久失效**问题
-> —— 在作者单机环境中让 Play Integrity 从「全红 / UNEVALUATED」恢复为 **3 绿**。
-> 该结果受机型、ROM、启动状态与 Google 策略影响，**不是普遍承诺**。
+## 这个模块做了什么
 
-**不写分区 · 不烧 keybox · 不伪造设备身份 · 不改变 Bootloader 状态。**
+RKP CN Bypass 是一个体积很小的 **Magisk / KernelSU / APatch** 模块。
+它在**运行时**绕过小米国行（CN）ROM 的 **CN-RKP 跳过逻辑**：把 `ro.boot.hwc` 从 `CN` 改为 `GL`，
+让 `keystore2` 不再跳过 Remote Key Provisioning（RKP），并维持 RKP 的密钥续期开关。
 
-> [!IMPORTANT]
-> **证据边界**：本模块的根因分析来自**单台设备的实机排查**（logcat、`keystore2` 二进制字符串与运行行为），
-> 尚未与小米官方源码或多机型交叉验证；文中「为什么」的解释属于**有证据支撑的推断**，不是上游源码结论。
-> 因此本模块**不承诺**在任何机型 / ROM 上恢复 Key Attestation，也**不是**通用的 Play Integrity
-> 修复或绕过工具。「恢复 RKP 流程」不等于「证书链有效」，更不等于「Play Integrity 判定通过」。
+**不写启动分区 · 不烧 keybox · 不伪造设备身份 · 不改变 Bootloader 状态。**
 
-<details>
-<summary><b>English summary / 英文简介</b></summary>
+## 可能解决什么问题
 
-### What is this?
+- 小米 / 红米**国行 ROM** 的 **`rkp_only` 机型**：Key Attestation 永久失效，
+  报 `ATTESTATION_KEYS_NOT_PROVISIONED`，Play Integrity 全部 `UNEVALUATED`
+- **伪回锁**（解锁后伪装成已锁、或非官方回锁）的小米机型，被检测工具报「TEE 损坏」时**可以尝试**；
+  能否生效取决于故障是否真的落在 CN-RKP 这一层，见[已知限制](#已知限制)
 
-Some Xiaomi China (CN) ROM builds ship a patched `keystore2` that skips Remote Key
-Provisioning (RKP) entirely:
-
-```
-W keystore2: .../remote_provisioning.rs:88 - CN device with TEE level, skipping RKP to avoid timeout blocking.
-```
-
-On devices whose attestation keys come **only** from RKP (`rkp_only=true`, no built-in
-keybox), this makes hardware Key Attestation fail permanently with
-`ATTESTATION_KEYS_NOT_PROVISIONED` — Play Integrity shows all `UNEVALUATED`, and relocking
-the bootloader does not help.
-
-This module restores the normal RKP path **at runtime only**:
-
-| File | What it does |
-|---|---|
-| `post-fs-data.sh` | Overrides `ro.boot.hwc` from `CN` to `GL` via `resetprop<sup>*</sup>` |
-| `service.sh` | Keeps `remote_key_provisioning_native/enable_rkpd` at `true` so keys renew |
-
-<sup>*</sup> `resetprop` is provided by Magisk / KernelSU / APatch. No partition, `boot.img`,
-`vbmeta`, or bootloader state is modified.
-
-### Requirements
-
-- Xiaomi / Redmi device on a **China (CN)** ROM
-- `getprop odm.xiaomi.security.tee.rkp_only` returns `true`
-- Working TEE (`keystore_cli_v2 generate` prints a `Hardware:` section)
-- Magisk, KernelSU, or APatch installed
-
-### Install
-
-1. Download the latest `RKP-CN-Bypass-*.zip` from
-   [Releases](https://github.com/DGGK2333/RKP-CN-Bypass/releases/latest).
-2. Flash it from your root manager (Magisk / KernelSU / APatch), then reboot.
-3. Force a fresh key provisioning once:
-
-   ```sh
-   su -c "pm clear com.android.rkpdapp"
-   su -c "am broadcast -a android.intent.action.BOOT_COMPLETED -n com.android.rkpdapp/.BootReceiver"
-   ```
-
-4. Verify with Play Integrity API Checker — it should report
-   `MEETS_BASIC_INTEGRITY` / `MEETS_DEVICE_INTEGRITY` / `MEETS_STRONG_INTEGRITY`.
-
-See the Chinese sections below for root-cause analysis, verification, troubleshooting and rollback.
-
-### Notes
-
-- Not a universal Play Integrity fix: on unlocked or "fake-relocked" devices, on devices with an
-  abnormal DICE / verified-boot state, or with keybox-injection setups, it is not expected to help.
-- Evidence is single-device and observational; see [`TESTING.md`](TESTING.md) for the test matrix.
-- Tested for research and personal device restoration only; use at your own risk.
-- Certificates are genuinely signed by Google's RKP servers for your device's real DICE
-  chain — no keybox, no spoofed hardware identity.
-- Not affiliated with Xiaomi or Google.
-
-</details>
+> 原理见[根因](#根因)与[工作原理](#工作原理)，作者的实际排查过程见[我的案例](#我的案例)。
+> 证据边界：根因分析来自单台设备的实机排查（logcat、`keystore2` 二进制字符串与运行行为），
+> 未与小米官方源码或多机型交叉验证，**不是普遍承诺**，也**不是**通用 Play Integrity 修复工具。
 
 ---
 
 ## 目录
 
+- [这个模块做了什么](#这个模块做了什么)
+- [可能解决什么问题](#可能解决什么问题)
 - [症状](#症状)
 - [适用范围](#适用范围)
 - [已知限制](#已知限制)
 - [根因](#根因)
 - [工作原理](#工作原理)
+- [我的案例](#我的案例)
 - [安装](#安装)
 - [更新](#更新)
 - [验证](#验证)
@@ -99,7 +46,7 @@ See the Chinese sections below for root-cause analysis, verification, troublesho
 - [测试矩阵](#测试矩阵)
 - [开发与发布](#开发与发布)
 - [更新日志](#更新日志)
-- [排查案例记录](#排查案例记录)
+- [English](#english)
 
 ---
 
@@ -318,6 +265,25 @@ RkpdPeriodicProvisioner: Successfully provisioned ...IRemotelyProvisionedCompone
 
 > `.../avf` 组件可能报 `403 DICE mode must be normal`，这是 Android 虚拟化框架（pVM）
 > 专用的 RKP 组件，**与日常 attestation 无关**，可以忽略。
+
+---
+
+## 我的案例
+
+以下证据来自**作者单台设备**的一次实机排查，未与小米源码或多机型交叉对照，
+仅作为诊断思路与线索记录，**不作为普适结论**：
+
+| 证据 | 含义 |
+|---|---|
+| `QSEE - Image Loaded, Delta - (4225484 Bytes)`（blackbox 分区） | TEE 镜像加载完整 |
+| `LoadSecureApps: ... Status = 0x0, AppId = 4294967297` | keymaster TA 加载成功 |
+| `keystore_cli_v2 generate` 输出 `Hardware:` 段 | TEE 能正常生成硬件密钥 |
+| `dumpsys remote_provisioning` 返回 `hwVersion=3 uniqueId=...` | RKP HAL 正常应答 |
+| Google 为 `default` 组件签发 12 把密钥 | 在该案例中 Google 侧 DICE 校验通过 |
+| `remote_provisioning.rs:88 - CN device with TEE level, skipping RKP` | 作者判断的病根（运行时证据，未核验源码） |
+
+即：在该案例中，**TEE 本身工作正常，失效的是软件允许它工作的那条路径**。
+但这不能反推「所有 `ATTESTATION_KEYS_NOT_PROVISIONED` 都是同一个原因」——见[已知限制](#已知限制)。
 
 ---
 
@@ -642,6 +608,7 @@ python3 build.py --verify   # 打包并校验模块结构、编码、update.json
 
 ### 未发布（文档修订，无模块行为变更）
 
+- 开头改为先说明「模块做了什么 / 可能解决什么问题」，原理与作者案例后置
 - 补充证据边界声明、已知限制、分层验证状态、持久化范围与风险说明
 - 把「Play Integrity 三绿」等结论条件化，不再作为普遍承诺
 - 新增 [TESTING.md](TESTING.md)：测试矩阵、分层证据采集与失败案例模板
@@ -663,22 +630,62 @@ python3 build.py --verify   # 打包并校验模块结构、编码、update.json
 
 ---
 
-## 排查案例记录
+## English
 
-以下证据来自**作者单台设备**的一次实机排查，未与小米源码或多机型交叉对照，
-仅作为诊断思路与线索记录，**不作为普适结论**：
+### What is this?
 
-| 证据 | 含义 |
+Some Xiaomi China (CN) ROM builds ship a patched `keystore2` that skips Remote Key
+Provisioning (RKP) entirely:
+
+```
+W keystore2: .../remote_provisioning.rs:88 - CN device with TEE level, skipping RKP to avoid timeout blocking.
+```
+
+On `rkp_only` devices whose attestation keys come only from RKP (no built-in keybox), this makes
+hardware Key Attestation fail permanently with `ATTESTATION_KEYS_NOT_PROVISIONED`; Play Integrity
+shows all `UNEVALUATED`, and relocking the bootloader does not help.
+
+This module restores the normal RKP path **at runtime only**:
+
+| File | What it does |
 |---|---|
-| `QSEE - Image Loaded, Delta - (4225484 Bytes)`（blackbox 分区） | TEE 镜像加载完整 |
-| `LoadSecureApps: ... Status = 0x0, AppId = 4294967297` | keymaster TA 加载成功 |
-| `keystore_cli_v2 generate` 输出 `Hardware:` 段 | TEE 能正常生成硬件密钥 |
-| `dumpsys remote_provisioning` 返回 `hwVersion=3 uniqueId=...` | RKP HAL 正常应答 |
-| Google 为 `default` 组件签发 12 把密钥 | 在该案例中 Google 侧 DICE 校验通过 |
-| `remote_provisioning.rs:88 - CN device with TEE level, skipping RKP` | 作者判断的病根（运行时证据，未核验源码） |
+| `post-fs-data.sh` | Overrides `ro.boot.hwc` from `CN` to `GL` via `resetprop` |
+| `service.sh` | Keeps `remote_key_provisioning_native/enable_rkpd` at `true` so keys renew |
 
-即：在该案例中，**TEE 本身工作正常，失效的是软件允许它工作的那条路径**。
-但这不能反推「所有 `ATTESTATION_KEYS_NOT_PROVISIONED` 都是同一个原因」——见[已知限制](#已知限制)。
+`resetprop` is provided by Magisk / KernelSU / APatch. No boot / `vbmeta` partition image or
+bootloader state is modified.
+
+### Requirements
+
+- Xiaomi / Redmi device on a **China (CN)** ROM
+- `getprop odm.xiaomi.security.tee.rkp_only` returns `true`
+- Working TEE (`keystore_cli_v2 generate` prints a `Hardware:` section)
+- Magisk, KernelSU, or APatch installed
+
+### Install
+
+1. Download the latest `RKP-CN-Bypass-*.zip` from
+   [Releases](https://github.com/DGGK2333/RKP-CN-Bypass/releases/latest).
+2. Flash it from your root manager (Magisk / KernelSU / APatch), then reboot.
+3. Force a fresh key provisioning once:
+
+   ```sh
+   su -c "pm clear com.android.rkpdapp"
+   su -c "am broadcast -a android.intent.action.BOOT_COMPLETED -n com.android.rkpdapp/.BootReceiver"
+   ```
+
+4. Verify with Play Integrity API Checker.
+
+### Notes
+
+- Not a universal Play Integrity fix: on unlocked or "fake-relocked" devices, or when the failure
+  is below this layer (KeyMint / TA errors, abnormal DICE, keybox injection), it is not expected
+  to help.
+- Evidence is single-device and observational; see [`TESTING.md`](TESTING.md) for the test matrix.
+- Tested for research and personal device restoration only; use at your own risk.
+- Certificates are genuinely signed by Google's RKP servers for your device's real DICE chain —
+  no keybox, no spoofed hardware identity.
+- Not affiliated with Xiaomi or Google.
 
 ---
 
