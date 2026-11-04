@@ -3,6 +3,13 @@
 本模块遵循 [语义化版本](https://semver.org/lang/zh-CN/)，`module.prop` 中的
 `versionCode` 每次发版递增，供 Magisk / KernelSU / APatch 判断是否需要更新。
 
+## 未发布（文档修订，无模块行为变更）
+
+- README：补充证据边界声明、已知限制、分层验证状态、持久化范围与风险说明
+- README：把「Play Integrity 三绿」等结论条件化，不再作为普遍承诺
+- 新增 `TESTING.md`：测试矩阵、分层证据采集清单与失败案例模板
+- 修正 `pm clear com.android.rkpdapp` 的副作用说明
+
 ## v1.1
 
 - 新增 `service.sh`：防止 `remote_key_provisioning_native/enable_rkpd`

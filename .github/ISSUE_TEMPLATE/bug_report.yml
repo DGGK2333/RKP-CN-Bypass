@@ -6,11 +6,16 @@ body:
   - type: markdown
     attributes:
       value: |
-        请先阅读 README 的「适用范围」「验证」「排障速查」三节，并确认：
+        请先阅读 README 的「适用范围」「已知限制」「验证」「排障速查」，以及
+        [TESTING.md](https://github.com/DGGK2333/RKP-CN-Bypass/blob/main/TESTING.md)，
+        并确认：
 
         - 设备为小米 / 红米国行 ROM，且 `getprop odm.xiaomi.security.tee.rkp_only` 为 `true`
         - TEE 本身正常（`keystore_cli_v2 generate` 能输出 `Hardware:` 段）
         - 已重启，且模块目录下没有 `disable` 文件
+
+        > 提交日志前请去掉 IMEI、序列号、账号、完整 keybox、私钥与 Play Integrity token 等敏感信息。
+        > `ATTESTATION_KEYS_NOT_PROVISIONED` 只是最终表现，请尽量按下方的「日志」字段采集分层证据。
 
   - type: input
     id: device
