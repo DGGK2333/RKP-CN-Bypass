@@ -1,0 +1,74 @@
+name: Bug report / 问题反馈
+description: 反馈模块在你的设备上不生效或表现异常
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先阅读 README 的「适用范围」「验证」「排障速查」三节，并确认：
+
+        - 设备为小米 / 红米国行 ROM，且 `getprop odm.xiaomi.security.tee.rkp_only` 为 `true`
+        - TEE 本身正常（`keystore_cli_v2 generate` 能输出 `Hardware:` 段）
+        - 已重启，且模块目录下没有 `disable` 文件
+
+  - type: input
+    id: device
+    attributes:
+      label: 设备型号 / 代号
+      placeholder: 例如 Xiaomi 17 Pro Max / popsicle
+    validations:
+      required: true
+
+  - type: input
+    id: rom
+    attributes:
+      label: ROM 版本
+      description: 系统版本 + 版本号，例如 HyperOS 3.0.1.0 / OS44
+    validations:
+      required: true
+
+  - type: dropdown
+    id: root
+    attributes:
+      label: Root 方案
+      options:
+        - Magisk
+        - KernelSU
+        - KernelSU Next / SukiSU / ReSukiSU
+        - APatch
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: hwc
+    attributes:
+      label: 模块安装后的属性值
+      description: 执行 `getprop ro.boot.hwc` 与 `getprop odm.xiaomi.security.tee.rkp_only` 的返回值
+      placeholder: ro.boot.hwc=GL, rkp_only=true
+    validations:
+      required: true
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 现象描述
+      description: 例如 Play Integrity 三个字段的结果、报错信息、复现步骤
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: |
+        建议提供以下命令的输出：
+
+        ```sh
+        logcat -d --pid=$(pidof keystore2) | grep -E 'CN device with TEE level|remote provisioned|without a provided'
+        cat /data/local/tmp/rkp_cn_bypass.log
+        ```
+      render: shell
+    validations:
+      required: false
